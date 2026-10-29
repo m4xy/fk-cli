@@ -17,7 +17,7 @@ search = Command("grep", "Searches files for lines that match a pattern.", Argum
   Search(pattern, files, ignoreCase, context)
 })
 
-@Console @Process main(args: List<String>) = Cli.run(search, args) { s -> ... }
+main(args: List<String>) = Cli.run(search, args) { s -> ... }
 ```
 
 ```
@@ -69,5 +69,5 @@ Options come anywhere, as `--name VALUE`, `--name=VALUE`, `-n VALUE`, `-nVALUE`,
 
 `Cli.read(command, args)` gives an `Outcome`: `Read(value)`, `HelpAsked(help)`, or `Wrong(problems,
 usage)`. `Cli.run(command, args) { value -> ... }` runs the program with the value, writes the help
-when it's asked for, and, when something's wrong, writes each problem and the usage and ends with exit
-code 2. `Cli.help` and `Cli.usage` write them for a command.
+when it's asked for, and, when something's wrong, writes each problem and the usage to standard error and
+ends with exit code 2. `Cli.help` and `Cli.usage` write them for a command.

@@ -1,4 +1,6 @@
 import fckt.collections.Maps.*
+import fckt.io.Channel
+import fckt.io.Channels.*
 import fckt.io.Console
 import fckt.io.Process
 import fckt.monads.Validation
@@ -28,16 +30,16 @@ module Cli {
     }
   }
 
-  // Runs the program with what the command line comes to: or, if it asks for help, writes the help;
-  // or, if something's wrong with it, writes each problem and the usage, and ends the program with
-  // exit code 2, as command-line tools do.
-  @Console @Process run<A>(command: Command<A>, args: List<String>, program: (A) -> Unit): Unit = when (read(command, args)) {
+  // Runs the program with what the command line comes to: or, if it asks for help, prints the help;
+  // or, if something's wrong with it, writes each problem and the usage to standard error, and ends
+  // the program with exit code 2, as command-line tools do.
+  @Console @Channel @Process run<A>(command: Command<A>, args: List<String>, program: (A) -> Unit): Unit = when (read(command, args)) {
     Read(value) -> program(value)
     HelpAsked(text) -> print(text)
     Wrong(problems, usageLine) -> {
-      problems.forEach { println("${command.name}: $it") }
-      println(usageLine)
-      println("try ${command.name} --help")
+      problems.forEach { printError("${command.name}: $it") }
+      printError(usageLine)
+      printError("try ${command.name} --help")
       exit(2)
     }
   }
