@@ -1,0 +1,5 @@
+import fckt.monads.Validation
+
+// A part of a command line, or several, and what's made of them: the parameters, for reading the
+// command line and for help, and how the value is made of what's given, or why it can't be.
+type Arg<A>(parameters: List<Parameter>, read: (Given) -> Validation<A, String>)

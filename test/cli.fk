@@ -1,0 +1,91 @@
+import uk.m4xy.fktests.api.Test
+import uk.m4xy.cli.*
+import uk.m4xy.cli.Arguments.*
+
+// Reading command lines, and the help made from what a command takes.
+
+type Search(pattern: String, files: List<String>, ignoreCase: Boolean, context: Int, output: Option<String>)
+
+search: Command<Search> = Command("grep", "Searches files for lines that match a pattern.", Arguments {
+  ignoreCase by flag("ignore-case", "match letters in either case", short = Some('i'))
+  context by optionOr("context", "N", "lines to show around each match", "0", short = Some('C')).as(Arguments.int)
+  output by option("output", "FILE", "where to write what's found", short = Some('o'))
+  pattern by argument("PATTERN", "what to look for")
+  files by arguments("FILE", "the files to search")
+  Search(pattern, files, ignoreCase, context, output)
+})
+
+read(args: List<String>): Outcome<Search> = Cli.read(search, args)
+
+@Test readsPositionalsInOrder() =
+  assertEquals(Read(Search("fox", ["a.txt", "b.txt"], false, 0, None)), read(["fox", "a.txt", "b.txt"]))
+
+@Test readsOptionsAnywhere() = {
+  assertEquals(Read(Search("fox", ["a.txt"], true, 2, Some("out"))), read(["-i", "fox", "--context", "2", "a.txt", "-o", "out"]))
+  assertEquals(Read(Search("fox", [], false, 3, Some("out"))), read(["--context=3", "fox", "--output=out"]))
+  assertEquals(Read(Search("fox", [], true, 4, Some("x"))), read(["-iC4", "-ox", "fox"]))
+}
+
+@Test dashDashEndsTheOptions() =
+  assertEquals(Read(Search("-i", ["--context"], false, 0, None)), read(["--", "-i", "--context"]))
+
+@Test aNegativeNumberIsAValue() =
+  assertEquals(Read(Search("-5", [], false, 0, None)), read(["-5"]))
+
+@Test findsEveryProblem() = when (read(["--colour", "-x", "--context", "many"])) {
+  Wrong(problems, usage) -> {
+    // Those of the command line as written, then each parameter's, in the order they're declared.
+    assertEquals(["there's no option --colour", "there's no option -x", "expected a whole number, not 'many'", "PATTERN is missing"], problems)
+    assertEquals("usage: grep [options] PATTERN FILE...", usage)
+  }
+  other -> assertEquals("Wrong", "$other")
+}
+
+@Test optionsNeedTheirValues() = when (read(["fox", "--output"])) {
+  Wrong(problems, _) -> assertEquals(["--output needs a FILE"], problems)
+  other -> assertEquals("Wrong", "$other")
+}
+
+@Test aFlagTakesNoValue() = when (read(["fox", "--ignore-case=yes"])) {
+  Wrong(problems, _) -> assertEquals(["--ignore-case takes no value"], problems)
+  other -> assertEquals("Wrong", "$other")
+}
+
+@Test helpIsMadeFromTheParameters() = assertEquals(HelpAsked(
+  "usage: grep [options] PATTERN FILE...\n" +
+    "\n" +
+    "Searches files for lines that match a pattern.\n" +
+    "\n" +
+    "arguments:\n" +
+    "  PATTERN            what to look for\n" +
+    "  FILE...            the files to search\n" +
+    "\n" +
+    "options:\n" +
+    "  -i, --ignore-case  match letters in either case\n" +
+    "  -C, --context N    lines to show around each match (otherwise 0)\n" +
+    "  -o, --output FILE  where to write what's found\n" +
+    "  -h, --help         show this help\n"
+), read(["fox", "--help"]))
+
+type Copy(from: String, to: String, force: Boolean)
+
+copy: Command<Copy> = Command("cp", "Copies a file.", Arguments {
+  force by flag("force", "replace what's there")
+  from by argument("FROM", "the file to copy")
+  to by argument("TO", "where to")
+  Copy(from, to, force)
+})
+
+@Test extraValuesAreProblems() = when (Cli.read(copy, ["a", "b", "c"])) {
+  Wrong(problems, _) -> assertEquals(["'c' is more than this takes"], problems)
+  other -> assertEquals("Wrong", "$other")
+}
+
+@Test aRepeatLeavesWhatRequiredOnesAfterItNeed() = {
+  move = Command("mv", "Moves files into a folder.", Arguments {
+    files by arguments("FILE", "what to move")
+    into by argument("FOLDER", "where to")
+    (files, into)
+  })
+  assertEquals(Read((["a", "b"], "dest")), Cli.read(move, ["a", "b", "dest"]))
+}

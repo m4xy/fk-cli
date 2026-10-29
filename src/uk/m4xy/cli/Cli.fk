@@ -1,0 +1,185 @@
+import fckt.collections.Maps.*
+import fckt.io.Console
+import fckt.io.Process
+import fckt.monads.Validation
+
+// Reading a program's command line by the Command it says it takes, and writing its help.
+//
+//   main(args: List<String>) = Cli.run(search, args) { s -> ... }
+//
+// Options come by name, anywhere: --name VALUE or --name=VALUE, -n VALUE or -nVALUE, and flags
+// together, -iv. -- ends them: what comes after is all values by position. --help and -h ask for the
+// help, which is made from the parameters.
+module Cli {
+  // What the command line comes to.
+  read<A>(command: Command<A>, args: List<String>): Outcome<A> = {
+    parameters = command.arguments.parameters
+    scanned = scan(parameters, args, Scanned([], emptyMap(), [], [], false, false))
+    if (scanned.helpAsked) HelpAsked(help(command))
+    else {
+      (positionals, positionProblems) = assigned(parameters, scanned.positionals)
+      given = Given(scanned.flags, scanned.values, positionals)
+      problems = scanned.problems + positionProblems
+      when (command.arguments.read(given)) {
+        Valid(value) if problems.isEmpty() -> Read(value)
+        Valid(_) -> Wrong(problems, usage(command))
+        Invalid(more) -> Wrong(problems + more, usage(command))
+      }
+    }
+  }
+
+  // Runs the program with what the command line comes to: or, if it asks for help, writes the help;
+  // or, if something's wrong with it, writes each problem and the usage, and ends the program with
+  // exit code 2, as command-line tools do.
+  @Console @Process run<A>(command: Command<A>, args: List<String>, program: (A) -> Unit): Unit = when (read(command, args)) {
+    Read(value) -> program(value)
+    HelpAsked(text) -> print(text)
+    Wrong(problems, usageLine) -> {
+      problems.forEach { println("${command.name}: $it") }
+      println(usageLine)
+      println("try ${command.name} --help")
+      exit(2)
+    }
+  }
+
+  // ---- Reading the command line ----
+
+  // What's been read so far: the flags there, each valued parameter's values, the positional
+  // values, what's wrong, whether help was asked for, and whether a -- has ended the options.
+  private type Scanned(
+    flags: List<String>,
+    values: Map<String, List<String>>,
+    positionals: List<String>,
+    problems: List<String>,
+    helpAsked: Boolean,
+    optionsEnded: Boolean,
+  )
+
+  private scan(parameters: List<Parameter>, args: List<String>, s: Scanned): Scanned = when (args) {
+    [] -> s
+    [arg, *rest] ->
+      if (s.optionsEnded || arg == "-" || !arg.startsWith("-")) scan(parameters, rest, s.copy(positionals = s.positionals + [arg]))
+      else if (arg == "--") scan(parameters, rest, s.copy(optionsEnded = true))
+      else if ((arg == "--help" || arg == "-h") && !defines(parameters, "help", Some('h'))) scan(parameters, rest, s.copy(helpAsked = true))
+      else if (arg.startsWith("--")) longOption(parameters, arg.drop(2), rest, s)
+      else shortOptions(parameters, arg.drop(1).toList(), arg, rest, s)
+  }
+
+  // --name, --name VALUE, or --name=VALUE.
+  private longOption(parameters: List<Parameter>, written: String, rest: List<String>, s: Scanned): Scanned = {
+    (name, inline) = if (written.contains("=")) (written.substringBefore("="), Some(written.substringAfter("="))) else (written, None)
+    when (parameters.find { p -> longName(p) == Some(name) }) {
+      Some(Flag(long, _, _)) -> when (inline) {
+        Some(_) -> scan(parameters, rest, problem(s, "--$long takes no value"))
+        None -> scan(parameters, rest, s.copy(flags = s.flags + [long]))
+      }
+      Some(Valued(long, _, valueName, _, _, _)) -> when ((inline, rest)) {
+        (Some(value), _) -> scan(parameters, rest, withValue(s, long, value))
+        (None, [value, *more]) if !value.startsWith("-") || value == "-" -> scan(parameters, more, withValue(s, long, value))
+        _ -> scan(parameters, rest, problem(s, "--$long needs a $valueName"))
+      }
+      _ -> scan(parameters, rest, problem(s, "there's no option --$name"))
+    }
+  }
+
+  // -v, -iv, -o VALUE, or -oVALUE: flags, each a character, the last maybe taking a value.
+  private shortOptions(parameters: List<Parameter>, chars: List<Char>, arg: String, rest: List<String>, s: Scanned): Scanned = when (chars) {
+    [] -> scan(parameters, rest, s)
+    [c, *more] -> when (parameters.find { p -> shortName(p) == Some(c) }) {
+      Some(Flag(long, _, _)) -> shortOptions(parameters, more, arg, rest, s.copy(flags = s.flags + [long]))
+      Some(Valued(long, _, valueName, _, _, _)) ->
+        if (more.isNotEmpty()) scan(parameters, rest, withValue(s, long, more.map { it.toString() }.joinToString("")))
+        else when (rest) {
+          [value, *after] if !value.startsWith("-") || value == "-" -> scan(parameters, after, withValue(s, long, value))
+          _ -> scan(parameters, rest, problem(s, "-$c needs a $valueName"))
+        }
+      _ ->
+        // A negative number, as -5, is a value, if there's no option of its first digit.
+        if (c.isDigit() && chars.size == arg.length - 1) scan(parameters, rest, s.copy(positionals = s.positionals + [arg]))
+        else scan(parameters, rest, problem(s, "there's no option -$c"))
+    }
+  }
+
+  private withValue(s: Scanned, long: String, value: String): Scanned =
+    s.copy(values = s.values.put(long, s.values.getOrDefault(long, []) + [value]))
+
+  private problem(s: Scanned, why: String): Scanned = s.copy(problems = s.problems + [why])
+
+  private defines(parameters: List<Parameter>, long: String, short: Option<Char>): Boolean =
+    parameters.any { p -> longName(p) == Some(long) || (short.isSome() && shortName(p) == short) }
+
+  private longName(p: Parameter): Option<String> = when (p) {
+    Flag(long, _, _) -> Some(long)
+    Valued(long, _, _, _, _, _) -> Some(long)
+    Positional(_, _, _, _) -> None
+  }
+
+  private shortName(p: Parameter): Option<Char> = when (p) {
+    Flag(_, short, _) -> short
+    Valued(_, short, _, _, _, _) -> short
+    Positional(_, _, _, _) -> None
+  }
+
+  // The positional values, each to its parameter in order: one each, or, repeated, the rest but
+  // those the required ones after it need; and any left over, which nothing takes.
+  private assigned(parameters: List<Parameter>, values: List<String>): (Map<String, List<String>>, List<String>) = {
+    positionals = parameters.mapNotNull { p ->
+      when (p) {
+        Positional(name, _, required, repeated) -> Some((name, required, repeated))
+        _ -> None
+      }
+    }
+    (taken, left) = positionals.withIndex().fold((emptyMap(), values)) { acc, entry ->
+      (m, remaining) = acc
+      (i, positional) = entry
+      (name, _, repeated) = positional
+      if (repeated) {
+        neededAfter = positionals.drop(i + 1).count { _, required, _ -> required }
+        count = if (remaining.size > neededAfter) remaining.size - neededAfter else 0
+        (m.put(name, remaining.take(count)), remaining.drop(count))
+      } else (m.put(name, remaining.take(1)), remaining.drop(1))
+    }
+    (taken, left.map { v -> "'$v' is more than this takes" })
+  }
+
+  // ---- Help ----
+
+  // How the command line goes: grep [options] PATTERN FILE...
+  usage<A>(command: Command<A>): String = {
+    parameters = command.arguments.parameters
+    options = if (parameters.any { p -> longName(p).isSome() }) " [options]" else ""
+    positionals = parameters.mapNotNull { p ->
+      when (p) {
+        Positional(name, _, required, repeated) ->
+          Some(if (repeated) " $name..." else if (required) " $name" else " [$name]")
+        _ -> None
+      }
+    }.joinToString("")
+    "usage: ${command.name}$options$positionals"
+  }
+
+  // The usage, what the program does, and each parameter with what it's for, in columns.
+  help<A>(command: Command<A>): String = {
+    parameters = command.arguments.parameters
+    positionals = parameters.mapNotNull { p ->
+      when (p) {
+        Positional(name, help, _, repeated) -> Some((if (repeated) "$name..." else name, help))
+        _ -> None
+      }
+    }
+    options = parameters.mapNotNull { p ->
+      when (p) {
+        Flag(long, short, help) -> Some((names(long, short), help))
+        Valued(long, short, valueName, help, required, otherwise) ->
+          Some(("${names(long, short)} $valueName", help + (if (required) " (required)" else "") + otherwise.map { " (otherwise $it)" }.getOrElse("")))
+        _ -> None
+      }
+    } + (if (defines(parameters, "help", Some('h'))) [] else [("-h, --help", "show this help")])
+    width = (positionals + options).map { name, _ -> name.length }.maxOrNone().getOrElse(0) + 2
+    section = (title: String, rows: List<(String, String)>) ->
+      if (rows.isEmpty()) "" else "\n$title:\n" + rows.map { name, help -> "  ${name.padEnd(width)}$help\n" }.joinToString("")
+    usage(command) + "\n\n" + command.summary + "\n" + section("arguments", positionals) + section("options", options)
+  }
+
+  private names(long: String, short: Option<Char>): String = short.map { "-$it, " }.getOrElse("    ") + "--$long"
+}

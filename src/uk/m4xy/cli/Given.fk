@@ -1,0 +1,5 @@
+import fckt.collections.Maps.*
+
+// What a command line gave, read against the parameters: the flags there, by long name; each valued
+// parameter's values, by long name, in order; and the positional values, by name.
+type Given(flags: List<String>, values: Map<String, List<String>>, positionals: Map<String, List<String>>)

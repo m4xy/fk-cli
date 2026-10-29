@@ -1,0 +1,7 @@
+// What reading a command line came to: the value; help, asked for with --help or -h; or what's wrong
+// with it, every problem found.
+type Outcome<A> {
+  Read(value: A),
+  HelpAsked(help: String),
+  Wrong(problems: List<String>, usage: String),
+}

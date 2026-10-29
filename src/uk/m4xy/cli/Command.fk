@@ -1,0 +1,2 @@
+// A program's command line: its name, a line saying what it does, and what it takes.
+type Command<A>(name: String, summary: String, arguments: Arg<A>)

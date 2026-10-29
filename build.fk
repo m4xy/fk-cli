@@ -1,0 +1,8 @@
+// fk-cli: reading a program's command line, as a block of what it takes, with help written from it.
+// kiln publishLocal publishes it.
+import uk.m4xy.kiln.fckt.Fckt
+import uk.m4xy.fktests.kiln.*
+
+project = Project(name = "fk-cli", group = "uk.m4xy", version = "0.1.0")
+
+plugins = [Fckt(), FkTests()]
