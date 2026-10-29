@@ -60,7 +60,7 @@ module Cli {
     [arg, *rest] ->
       if (s.optionsEnded || arg == "-" || !arg.startsWith("-")) scan(parameters, rest, s.copy(positionals = s.positionals + [arg]))
       else if (arg == "--") scan(parameters, rest, s.copy(optionsEnded = true))
-      else if ((arg == "--help" || arg == "-h") && !defines(parameters, "help", Some('h'))) scan(parameters, rest, s.copy(helpAsked = true))
+      else if (asksForHelp(parameters, arg)) scan(parameters, rest, s.copy(helpAsked = true))
       else if (arg.startsWith("--")) longOption(parameters, arg.drop(2), rest, s)
       else shortOptions(parameters, arg.drop(1).toList(), arg, rest, s)
   }
@@ -105,8 +105,13 @@ module Cli {
 
   private problem(s: Scanned, why: String): Scanned = s.copy(problems = s.problems + [why])
 
-  private defines(parameters: List<Parameter>, long: String, short: Option<Char>): Boolean =
-    parameters.any { p -> longName(p) == Some(long) || (short.isSome() && shortName(p) == short) }
+  // Whether the argument is --help or -h, and no parameter takes that spelling for itself.
+  private asksForHelp(parameters: List<Parameter>, arg: String): Boolean =
+    (arg == "--help" && !takesLong(parameters, "help")) || (arg == "-h" && !takesShort(parameters, 'h'))
+
+  private takesLong(parameters: List<Parameter>, long: String): Boolean = parameters.any { p -> longName(p) == Some(long) }
+
+  private takesShort(parameters: List<Parameter>, short: Char): Boolean = parameters.any { p -> shortName(p) == Some(short) }
 
   private longName(p: Parameter): Option<String> = when (p) {
     Flag(long, _, _) -> Some(long)
@@ -174,12 +179,17 @@ module Cli {
           Some(("${names(long, short)} $valueName", help + (if (required) " (required)" else "") + otherwise.map { " (otherwise $it)" }.getOrElse("")))
         _ -> None
       }
-    } + (if (defines(parameters, "help", Some('h'))) [] else [("-h, --help", "show this help")])
+    } + helpOption(parameters)
     width = (positionals + options).map { name, _ -> name.length }.maxOrNone().getOrElse(0) + 2
     section = (title: String, rows: List<(String, String)>) ->
       if (rows.isEmpty()) "" else "\n$title:\n" + rows.map { name, help -> "  ${name.padEnd(width)}$help\n" }.joinToString("")
     usage(command) + "\n\n" + command.summary + "\n" + section("arguments", positionals) + section("options", options)
   }
+
+  // How help is asked for, as far as the parameters leave its spellings free.
+  private helpOption(parameters: List<Parameter>): List<(String, String)> =
+    if (takesLong(parameters, "help")) []
+    else [(names("help", if (takesShort(parameters, 'h')) None else Some('h')), "show this help")]
 
   private names(long: String, short: Option<Char>): String = short.map { "-$it, " }.getOrElse("    ") + "--$long"
 }

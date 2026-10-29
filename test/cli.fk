@@ -89,3 +89,19 @@ copy: Command<Copy> = Command("cp", "Copies a file.", Arguments {
   })
   assertEquals(Read((["a", "b"], "dest")), Cli.read(move, ["a", "b", "dest"]))
 }
+
+type Listing(human: Boolean)
+
+listing: Command<Listing> = Command("ls", "Lists files.", Arguments {
+  human by flag("human-readable", "sizes in K, M and G", short = Some('h'))
+  Listing(human)
+})
+
+@Test aParameterCanTakeHForItselfAndLeaveHelp() = {
+  assertEquals(Read(Listing(true)), Cli.read(listing, ["-h"]))
+  assertEquals(
+    "usage: ls [options]\n\nLists files.\n\noptions:\n  -h, --human-readable  sizes in K, M and G\n      --help            show this help\n",
+    Cli.help(listing),
+  )
+  assertEquals(HelpAsked(Cli.help(listing)), Cli.read(listing, ["--help"]))
+}
