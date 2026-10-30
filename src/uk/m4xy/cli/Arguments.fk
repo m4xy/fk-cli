@@ -2,15 +2,6 @@ import fckt.collections.Maps.*
 import fckt.monads.Validation
 import fckt.monads.Validated
 
-// What a command line takes, a part at a time. Its parts don't depend on each other, so a block of
-// them reads them all, and finds every problem, not just the first:
-//
-//   Arguments {
-//     ignoreCase by flag("ignore-case", "match letters in either case", short = Some('i'))
-//     pattern by argument("PATTERN", "what to look for")
-//     files by arguments("FILE", "the files to search")
-//     Search(pattern, files, ignoreCase)
-//   }
 module Arguments : Applicative {
   type M<A> = Arg<A>
 
@@ -21,52 +12,37 @@ module Arguments : Applicative {
   product<A, B>(ma: Arg<A>, mb: Arg<B>): Arg<(A, B)> =
     Arg(ma.parameters + mb.parameters, given -> Validated.product(ma.read(given), mb.read(given)))
 
-  // ---- Options ----
-
-  // --name: whether it's there.
   flag(long: String, help: String, short: Option<Char> = None): Arg<Boolean> =
     Arg([Flag(long, short, help)], given -> Valid(given.flags.contains(long)))
 
-  // --name VALUE: its value, if it's there; given more than once, the last.
   option(long: String, valueName: String, help: String, short: Option<Char> = None): Arg<Option<String>> =
     Arg([Valued(long, short, valueName, help, false, None)], given -> Valid(given.values.getOrDefault(long, []).lastOrNone()))
 
-  // --name VALUE, or, without it, what it otherwise is, which help says.
   optionOr(long: String, valueName: String, help: String, otherwise: String, short: Option<Char> = None): Arg<String> =
     Arg([Valued(long, short, valueName, help, false, Some(otherwise))], given ->
       Valid(given.values.getOrDefault(long, []).lastOrNone().getOrElse(otherwise)))
 
-  // --name VALUE, which must be there.
   required(long: String, valueName: String, help: String, short: Option<Char> = None): Arg<String> =
     Arg([Valued(long, short, valueName, help, true, None)], given -> when (given.values.getOrDefault(long, []).lastOrNone()) {
       Some(value) -> Valid(value)
       None -> Invalid(["--$long $valueName is required"])
     })
 
-  // --name VALUE, any number of times: each value, in order.
   repeated(long: String, valueName: String, help: String, short: Option<Char> = None): Arg<List<String>> =
     Arg([Valued(long, short, valueName, help, false, None)], given -> Valid(given.values.getOrDefault(long, [])))
 
-  // ---- Positional values ----
-
-  // NAME: the next value by position, which must be there.
   argument(name: String, help: String): Arg<String> =
     Arg([Positional(name, help, true, false)], given -> when (given.positionals.getOrDefault(name, [])) {
       [value, *_] -> Valid(value)
       [] -> Invalid(["$name is missing"])
     })
 
-  // [NAME]: the next value by position, if there's one.
   optionalArgument(name: String, help: String): Arg<Option<String>> =
     Arg([Positional(name, help, false, false)], given -> Valid(given.positionals.getOrDefault(name, []).firstOrNone()))
 
-  // NAME...: the rest of the values by position, any number.
   arguments(name: String, help: String): Arg<List<String>> =
     Arg([Positional(name, help, false, true)], given -> Valid(given.positionals.getOrDefault(name, [])))
 
-  // ---- Values of other types ----
-
-  // The value, read as something else, or why it can't be: argument("COUNT", ...).as(Arguments.int).
   Arg<A>.as<B>(read: (A) -> Result<B, String>): Arg<B> = Arg(this.parameters, given ->
     when (this.read(given)) {
       Valid(a) -> when (read(a)) {
@@ -76,6 +52,5 @@ module Arguments : Applicative {
       Invalid(problems) -> Invalid(problems)
     })
 
-  // A whole number, written in decimal.
   int(text: String): Result<Int, String> = text.toIntOrNone().toResult("expected a whole number, not '$text'")
 }

@@ -2,8 +2,6 @@ import uk.m4xy.fktests.api.Test
 import uk.m4xy.cli.*
 import uk.m4xy.cli.Arguments.*
 
-// Reading command lines, and the help made from what a command takes.
-
 type Search(pattern: String, files: List<String>, ignoreCase: Boolean, context: Int, output: Option<String>)
 
 search: Command<Search> = Command("grep", "Searches files for lines that match a pattern.", Arguments {
@@ -34,7 +32,6 @@ read(args: List<String>): Outcome<Search> = Cli.read(search, args)
 
 @Test findsEveryProblem() = when (read(["--colour", "-x", "--context", "many"])) {
   Wrong(problems, usage) -> {
-    // Those of the command line as written, then each parameter's, in the order they're declared.
     assertEquals(["there's no option --colour", "there's no option -x", "expected a whole number, not 'many'", "PATTERN is missing"], problems)
     assertEquals("usage: grep [options] PATTERN FILE...", usage)
   }

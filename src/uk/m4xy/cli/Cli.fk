@@ -5,15 +5,7 @@ import fckt.io.Console
 import fckt.io.Process
 import fckt.monads.Validation
 
-// Reading a program's command line by the Command it says it takes, and writing its help.
-//
-//   main(args: List<String>) = Cli.run(search, args) { s -> ... }
-//
-// Options come by name, anywhere: --name VALUE or --name=VALUE, -n VALUE or -nVALUE, and flags
-// together, -iv. -- ends them: what comes after is all values by position. --help and -h ask for the
-// help, which is made from the parameters.
 module Cli {
-  // What the command line comes to.
   read<A>(command: Command<A>, args: List<String>): Outcome<A> = {
     parameters = command.arguments.parameters
     scanned = scan(parameters, args, Scanned([], emptyMap(), [], [], false, false))
@@ -30,9 +22,6 @@ module Cli {
     }
   }
 
-  // Runs the program with what the command line comes to: or, if it asks for help, prints the help;
-  // or, if something's wrong with it, writes each problem and the usage to standard error, and ends
-  // the program with exit code 2, as command-line tools do.
   @Console @Channel @Process run<A>(command: Command<A>, args: List<String>, program: (A) -> Unit): Unit = when (read(command, args)) {
     Read(value) -> program(value)
     HelpAsked(text) -> print(text)
@@ -44,10 +33,6 @@ module Cli {
     }
   }
 
-  // ---- Reading the command line ----
-
-  // What's been read so far: the flags there, each valued parameter's values, the positional
-  // values, what's wrong, whether help was asked for, and whether a -- has ended the options.
   private type Scanned(
     flags: List<String>,
     values: Map<String, List<String>>,
@@ -67,7 +52,6 @@ module Cli {
       else shortOptions(parameters, arg.drop(1).toList(), arg, rest, s)
   }
 
-  // --name, --name VALUE, or --name=VALUE.
   private longOption(parameters: List<Parameter>, written: String, rest: List<String>, s: Scanned): Scanned = {
     (name, inline) = if (written.contains("=")) (written.substringBefore("="), Some(written.substringAfter("="))) else (written, None)
     when (parameters.find { p -> longName(p) == Some(name) }) {
@@ -84,7 +68,6 @@ module Cli {
     }
   }
 
-  // -v, -iv, -o VALUE, or -oVALUE: flags, each a character, the last maybe taking a value.
   private shortOptions(parameters: List<Parameter>, chars: List<Char>, arg: String, rest: List<String>, s: Scanned): Scanned = when (chars) {
     [] -> scan(parameters, rest, s)
     [c, *more] -> when (parameters.find { p -> shortName(p) == Some(c) }) {
@@ -96,7 +79,6 @@ module Cli {
           _ -> scan(parameters, rest, problem(s, "-$c needs a $valueName"))
         }
       _ ->
-        // A negative number, as -5, is a value, if there's no option of its first digit.
         if (c.isDigit() && chars.size == arg.length - 1) scan(parameters, rest, s.copy(positionals = s.positionals + [arg]))
         else scan(parameters, rest, problem(s, "there's no option -$c"))
     }
@@ -107,7 +89,6 @@ module Cli {
 
   private problem(s: Scanned, why: String): Scanned = s.copy(problems = s.problems + [why])
 
-  // Whether the argument is --help or -h, and no parameter takes that spelling for itself.
   private asksForHelp(parameters: List<Parameter>, arg: String): Boolean =
     (arg == "--help" && !takesLong(parameters, "help")) || (arg == "-h" && !takesShort(parameters, 'h'))
 
@@ -127,8 +108,6 @@ module Cli {
     Positional(_, _, _, _) -> None
   }
 
-  // The positional values, each to its parameter in order: one each, or, repeated, the rest but
-  // those the required ones after it need; and any left over, which nothing takes.
   private assigned(parameters: List<Parameter>, values: List<String>): (Map<String, List<String>>, List<String>) = {
     positionals = parameters.mapNotNull { p ->
       when (p) {
@@ -149,9 +128,6 @@ module Cli {
     (taken, left.map { v -> "'$v' is more than this takes" })
   }
 
-  // ---- Help ----
-
-  // How the command line goes: grep [options] PATTERN FILE...
   usage<A>(command: Command<A>): String = {
     parameters = command.arguments.parameters
     options = if (parameters.any { p -> longName(p).isSome() }) " [options]" else ""
@@ -165,7 +141,6 @@ module Cli {
     "usage: ${command.name}$options$positionals"
   }
 
-  // The usage, what the program does, and each parameter with what it's for, in columns.
   help<A>(command: Command<A>): String = {
     parameters = command.arguments.parameters
     positionals = parameters.mapNotNull { p ->
@@ -188,7 +163,6 @@ module Cli {
     usage(command) + "\n\n" + command.summary + "\n" + section("arguments", positionals) + section("options", options)
   }
 
-  // How help is asked for, as far as the parameters leave its spellings free.
   private helpOption(parameters: List<Parameter>): List<(String, String)> =
     if (takesLong(parameters, "help")) []
     else [(names("help", if (takesShort(parameters, 'h')) None else Some('h')), "show this help")]

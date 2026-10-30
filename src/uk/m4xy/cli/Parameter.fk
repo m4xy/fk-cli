@@ -1,10 +1,5 @@
-// Something a command line can have, as help describes it.
 type Parameter {
-  // --verbose, or -v: there, or not.
   Flag(long: String, short: Option<Char>, help: String),
-  // --output FILE, --output=FILE, or -o FILE: a value; required, or else what it is without one, if
-  // it says.
   Valued(long: String, short: Option<Char>, valueName: String, help: String, required: Boolean, otherwise: Option<String>),
-  // A value by position, in order: NAME, or, repeated, any number of them, NAME...
   Positional(name: String, help: String, required: Boolean, repeated: Boolean),
 }
