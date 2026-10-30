@@ -153,7 +153,9 @@ module Cli {
       when (p) {
         Flag(long, short, help) -> Some((names(long, short), help))
         Valued(long, short, valueName, help, required, otherwise) ->
-          Some(("${names(long, short)} $valueName", help + (if (required) " (required)" else "") + otherwise.map { " (otherwise $it)" }.getOrElse("")))
+          Some(
+            ("${names(long, short)} $valueName", help + (if (required) " (required)" else "") + otherwise.map { " (otherwise $it)" }.getOrElse("")),
+          )
         _ -> None
       }
     } + helpOption(parameters)

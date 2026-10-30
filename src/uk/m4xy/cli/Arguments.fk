@@ -16,7 +16,10 @@ module Arguments : Applicative {
     Arg([Flag(long, short, help)], given -> Valid(given.flags.contains(long)))
 
   option(long: String, valueName: String, help: String, short: Option<Char> = None): Arg<Option<String>> =
-    Arg([Valued(long, short, valueName, help, false, None)], given -> Valid(given.values.getOrDefault(long, []).lastOrNone()))
+    Arg(
+      [Valued(long, short, valueName, help, false, None)],
+      given -> Valid(given.values.getOrDefault(long, []).lastOrNone()),
+    )
 
   optionOr(long: String, valueName: String, help: String, otherwise: String, short: Option<Char> = None): Arg<String> =
     Arg([Valued(long, short, valueName, help, false, Some(otherwise))], given ->
@@ -29,7 +32,10 @@ module Arguments : Applicative {
     })
 
   repeated(long: String, valueName: String, help: String, short: Option<Char> = None): Arg<List<String>> =
-    Arg([Valued(long, short, valueName, help, false, None)], given -> Valid(given.values.getOrDefault(long, [])))
+    Arg(
+      [Valued(long, short, valueName, help, false, None)],
+      given -> Valid(given.values.getOrDefault(long, [])),
+    )
 
   argument(name: String, help: String): Arg<String> =
     Arg([Positional(name, help, true, false)], given -> when (given.positionals.getOrDefault(name, [])) {
@@ -38,10 +44,16 @@ module Arguments : Applicative {
     })
 
   optionalArgument(name: String, help: String): Arg<Option<String>> =
-    Arg([Positional(name, help, false, false)], given -> Valid(given.positionals.getOrDefault(name, []).firstOrNone()))
+    Arg(
+      [Positional(name, help, false, false)],
+      given -> Valid(given.positionals.getOrDefault(name, []).firstOrNone()),
+    )
 
   arguments(name: String, help: String): Arg<List<String>> =
-    Arg([Positional(name, help, false, true)], given -> Valid(given.positionals.getOrDefault(name, [])))
+    Arg(
+      [Positional(name, help, false, true)],
+      given -> Valid(given.positionals.getOrDefault(name, [])),
+    )
 
   Arg<A>.as<B>(read: (A) -> Result<B, String>): Arg<B> = Arg(this.parameters, given ->
     when (this.read(given)) {

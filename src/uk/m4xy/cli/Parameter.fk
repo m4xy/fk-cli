@@ -1,5 +1,12 @@
 type Parameter {
   Flag(long: String, short: Option<Char>, help: String),
-  Valued(long: String, short: Option<Char>, valueName: String, help: String, required: Boolean, otherwise: Option<String>),
+  Valued(
+    long: String,
+    short: Option<Char>,
+    valueName: String,
+    help: String,
+    required: Boolean,
+    otherwise: Option<String>,
+  ),
   Positional(name: String, help: String, required: Boolean, repeated: Boolean),
 }

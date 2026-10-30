@@ -1,3 +1,7 @@
 import fckt.collections.Maps.*
 
-type Given(flags: List<String>, values: Map<String, List<String>>, positionals: Map<String, List<String>>)
+type Given(
+  flags: List<String>,
+  values: Map<String, List<String>>,
+  positionals: Map<String, List<String>>,
+)

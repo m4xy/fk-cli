@@ -2,7 +2,13 @@ import uk.m4xy.fktests.api.Test
 import uk.m4xy.cli.*
 import uk.m4xy.cli.Arguments.*
 
-type Search(pattern: String, files: List<String>, ignoreCase: Boolean, context: Int, output: Option<String>)
+type Search(
+  pattern: String,
+  files: List<String>,
+  ignoreCase: Boolean,
+  context: Int,
+  output: Option<String>,
+)
 
 search: Command<Search> = Command("grep", "Searches files for lines that match a pattern.", Arguments {
   ignoreCase by flag("ignore-case", "match letters in either case", short = Some('i'))
@@ -16,11 +22,20 @@ search: Command<Search> = Command("grep", "Searches files for lines that match a
 read(args: List<String>): Outcome<Search> = Cli.read(search, args)
 
 @Test readsPositionalsInOrder() =
-  assertEquals(Read(Search("fox", ["a.txt", "b.txt"], false, 0, None)), read(["fox", "a.txt", "b.txt"]))
+  assertEquals(
+    Read(Search("fox", ["a.txt", "b.txt"], false, 0, None)),
+    read(["fox", "a.txt", "b.txt"]),
+  )
 
 @Test readsOptionsAnywhere() = {
-  assertEquals(Read(Search("fox", ["a.txt"], true, 2, Some("out"))), read(["-i", "fox", "--context", "2", "a.txt", "-o", "out"]))
-  assertEquals(Read(Search("fox", [], false, 3, Some("out"))), read(["--context=3", "fox", "--output=out"]))
+  assertEquals(
+    Read(Search("fox", ["a.txt"], true, 2, Some("out"))),
+    read(["-i", "fox", "--context", "2", "a.txt", "-o", "out"]),
+  )
+  assertEquals(
+    Read(Search("fox", [], false, 3, Some("out"))),
+    read(["--context=3", "fox", "--output=out"]),
+  )
   assertEquals(Read(Search("fox", [], true, 4, Some("x"))), read(["-iC4", "-ox", "fox"]))
 }
 
@@ -32,7 +47,15 @@ read(args: List<String>): Outcome<Search> = Cli.read(search, args)
 
 @Test findsEveryProblem() = when (read(["--colour", "-x", "--context", "many"])) {
   Wrong(problems, usage) -> {
-    assertEquals(["there's no option --colour", "there's no option -x", "expected a whole number, not 'many'", "PATTERN is missing"], problems)
+    assertEquals(
+      [
+        "there's no option --colour",
+        "there's no option -x",
+        "expected a whole number, not 'many'",
+        "PATTERN is missing",
+      ],
+      problems,
+    )
     assertEquals("usage: grep [options] PATTERN FILE...", usage)
   }
   other -> assertEquals("Wrong", "$other")
