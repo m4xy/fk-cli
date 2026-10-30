@@ -7,7 +7,10 @@ module Arguments : Applicative {
 
   pure<A>(x: A): Arg<A> = Arg([], _ -> Valid(x))
 
-  map<A, B>(m: Arg<A>, f: (A) -> B): Arg<B> = Arg(m.parameters, given -> Validated.map(m.read(given), f))
+  map<A, B>(
+    m: Arg<A>,
+    f: (A) -> B,
+  ): Arg<B> = Arg(m.parameters, given -> Validated.map(m.read(given), f))
 
   product<A, B>(ma: Arg<A>, mb: Arg<B>): Arg<(A, B)> =
     Arg(ma.parameters + mb.parameters, given -> Validated.product(ma.read(given), mb.read(given)))
@@ -15,13 +18,24 @@ module Arguments : Applicative {
   flag(long: String, help: String, short: Option<Char> = None): Arg<Boolean> =
     Arg([Flag(long, short, help)], given -> Valid(given.flags.contains(long)))
 
-  option(long: String, valueName: String, help: String, short: Option<Char> = None): Arg<Option<String>> =
+  option(
+    long: String,
+    valueName: String,
+    help: String,
+    short: Option<Char> = None,
+  ): Arg<Option<String>> =
     Arg(
       [Valued(long, short, valueName, help, false, None)],
       given -> Valid(given.values.getOrDefault(long, []).lastOrNone()),
     )
 
-  optionOr(long: String, valueName: String, help: String, otherwise: String, short: Option<Char> = None): Arg<String> =
+  optionOr(
+    long: String,
+    valueName: String,
+    help: String,
+    otherwise: String,
+    short: Option<Char> = None,
+  ): Arg<String> =
     Arg([Valued(long, short, valueName, help, false, Some(otherwise))], given ->
       Valid(given.values.getOrDefault(long, []).lastOrNone().getOrElse(otherwise)))
 
@@ -31,7 +45,12 @@ module Arguments : Applicative {
       None -> Invalid(["--$long $valueName is required"])
     })
 
-  repeated(long: String, valueName: String, help: String, short: Option<Char> = None): Arg<List<String>> =
+  repeated(
+    long: String,
+    valueName: String,
+    help: String,
+    short: Option<Char> = None,
+  ): Arg<List<String>> =
     Arg(
       [Valued(long, short, valueName, help, false, None)],
       given -> Valid(given.values.getOrDefault(long, [])),
@@ -64,5 +83,7 @@ module Arguments : Applicative {
       Invalid(problems) -> Invalid(problems)
     })
 
-  int(text: String): Result<Int, String> = text.toIntOrNone().toResult("expected a whole number, not '$text'")
+  int(
+    text: String,
+  ): Result<Int, String> = text.toIntOrNone().toResult("expected a whole number, not '$text'")
 }

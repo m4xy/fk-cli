@@ -12,7 +12,9 @@ type Search(
 
 search: Command<Search> = Command("grep", "Searches files for lines that match a pattern.", Arguments {
   ignoreCase by flag("ignore-case", "match letters in either case", short = Some('i'))
-  context by optionOr("context", "N", "lines to show around each match", "0", short = Some('C')).as(Arguments.int)
+  context by optionOr("context", "N", "lines to show around each match", "0", short = Some('C')).as(
+    Arguments.int,
+  )
   output by option("output", "FILE", "where to write what's found", short = Some('o'))
   pattern by argument("PATTERN", "what to look for")
   files by arguments("FILE", "the files to search")

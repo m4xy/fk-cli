@@ -22,7 +22,11 @@ module Cli {
     }
   }
 
-  @Console @Channel @Process run<A>(command: Command<A>, args: List<String>, program: (A) -> Unit): Unit = when (read(command, args)) {
+  @Console @Channel @Process run<A>(
+    command: Command<A>,
+    args: List<String>,
+    program: (A) -> Unit,
+  ): Unit = when (read(command, args)) {
     Read(value) -> program(value)
     HelpAsked(text) -> print(text)
     Wrong(problems, usageLine) -> {
@@ -45,14 +49,23 @@ module Cli {
   private scan(parameters: List<Parameter>, args: List<String>, s: Scanned): Scanned = when (args) {
     [] -> s
     [arg, *rest] ->
-      if (s.optionsEnded || arg == "-" || !arg.startsWith("-")) scan(parameters, rest, s.copy(positionals = s.positionals + [arg]))
+      if (s.optionsEnded || arg == "-" || !arg.startsWith("-")) scan(
+        parameters,
+        rest,
+        s.copy(positionals = s.positionals + [arg]),
+      )
       else if (arg == "--") scan(parameters, rest, s.copy(optionsEnded = true))
       else if (asksForHelp(parameters, arg)) scan(parameters, rest, s.copy(helpAsked = true))
       else if (arg.startsWith("--")) longOption(parameters, arg.drop(2), rest, s)
       else shortOptions(parameters, arg.drop(1).toList(), arg, rest, s)
   }
 
-  private longOption(parameters: List<Parameter>, written: String, rest: List<String>, s: Scanned): Scanned = {
+  private longOption(
+    parameters: List<Parameter>,
+    written: String,
+    rest: List<String>,
+    s: Scanned,
+  ): Scanned = {
     (name, inline) = if (written.contains("=")) (written.substringBefore("="), Some(written.substringAfter("="))) else (written, None)
     when (parameters.find { p -> longName(p) == Some(name) }) {
       Some(Flag(long, _, _)) -> when (inline) {
@@ -61,25 +74,53 @@ module Cli {
       }
       Some(Valued(long, _, valueName, _, _, _)) -> when ((inline, rest)) {
         (Some(value), _) -> scan(parameters, rest, withValue(s, long, value))
-        (None, [value, *more]) if !value.startsWith("-") || value == "-" -> scan(parameters, more, withValue(s, long, value))
+        (None, [value, *more]) if !value.startsWith("-") || value == "-" -> scan(
+          parameters,
+          more,
+          withValue(s, long, value),
+        )
         _ -> scan(parameters, rest, problem(s, "--$long needs a $valueName"))
       }
       _ -> scan(parameters, rest, problem(s, "there's no option --$name"))
     }
   }
 
-  private shortOptions(parameters: List<Parameter>, chars: List<Char>, arg: String, rest: List<String>, s: Scanned): Scanned = when (chars) {
+  private shortOptions(
+    parameters: List<Parameter>,
+    chars: List<Char>,
+    arg: String,
+    rest: List<String>,
+    s: Scanned,
+  ): Scanned = when (chars) {
     [] -> scan(parameters, rest, s)
     [c, *more] -> when (parameters.find { p -> shortName(p) == Some(c) }) {
-      Some(Flag(long, _, _)) -> shortOptions(parameters, more, arg, rest, s.copy(flags = s.flags + [long]))
+      Some(Flag(long, _, _)) -> shortOptions(
+        parameters,
+        more,
+        arg,
+        rest,
+        s.copy(flags = s.flags + [long]),
+      )
       Some(Valued(long, _, valueName, _, _, _)) ->
-        if (more.isNotEmpty()) scan(parameters, rest, withValue(s, long, more.map { it.toString() }.joinToString("")))
+        if (more.isNotEmpty()) scan(
+          parameters,
+          rest,
+          withValue(s, long, more.map { it.toString() }.joinToString("")),
+        )
         else when (rest) {
-          [value, *after] if !value.startsWith("-") || value == "-" -> scan(parameters, after, withValue(s, long, value))
+          [value, *after] if !value.startsWith("-") || value == "-" -> scan(
+            parameters,
+            after,
+            withValue(s, long, value),
+          )
           _ -> scan(parameters, rest, problem(s, "-$c needs a $valueName"))
         }
       _ ->
-        if (c.isDigit() && chars.size == arg.length - 1) scan(parameters, rest, s.copy(positionals = s.positionals + [arg]))
+        if (c.isDigit() && chars.size == arg.length - 1) scan(
+          parameters,
+          rest,
+          s.copy(positionals = s.positionals + [arg]),
+        )
         else scan(parameters, rest, problem(s, "there's no option -$c"))
     }
   }
@@ -92,9 +133,15 @@ module Cli {
   private asksForHelp(parameters: List<Parameter>, arg: String): Boolean =
     (arg == "--help" && !takesLong(parameters, "help")) || (arg == "-h" && !takesShort(parameters, 'h'))
 
-  private takesLong(parameters: List<Parameter>, long: String): Boolean = parameters.any { p -> longName(p) == Some(long) }
+  private takesLong(
+    parameters: List<Parameter>,
+    long: String,
+  ): Boolean = parameters.any { p -> longName(p) == Some(long) }
 
-  private takesShort(parameters: List<Parameter>, short: Char): Boolean = parameters.any { p -> shortName(p) == Some(short) }
+  private takesShort(
+    parameters: List<Parameter>,
+    short: Char,
+  ): Boolean = parameters.any { p -> shortName(p) == Some(short) }
 
   private longName(p: Parameter): Option<String> = when (p) {
     Flag(long, _, _) -> Some(long)
@@ -108,7 +155,10 @@ module Cli {
     Positional(_, _, _, _) -> None
   }
 
-  private assigned(parameters: List<Parameter>, values: List<String>): (Map<String, List<String>>, List<String>) = {
+  private assigned(
+    parameters: List<Parameter>,
+    values: List<String>,
+  ): (Map<String, List<String>>, List<String>) = {
     positionals = parameters.mapNotNull { p ->
       when (p) {
         Positional(name, _, required, repeated) -> Some((name, required, repeated))
@@ -162,12 +212,18 @@ module Cli {
     width = (positionals + options).map { name, _ -> name.length }.maxOrNone().getOrElse(0) + 2
     section = (title: String, rows: List<(String, String)>) ->
       if (rows.isEmpty()) "" else "\n$title:\n" + rows.map { name, help -> "  ${name.padEnd(width)}$help\n" }.joinToString("")
-    usage(command) + "\n\n" + command.summary + "\n" + section("arguments", positionals) + section("options", options)
+    usage(command) + "\n\n" + command.summary + "\n" + section("arguments", positionals) + section(
+      "options",
+      options,
+    )
   }
 
   private helpOption(parameters: List<Parameter>): List<(String, String)> =
     if (takesLong(parameters, "help")) []
     else [(names("help", if (takesShort(parameters, 'h')) None else Some('h')), "show this help")]
 
-  private names(long: String, short: Option<Char>): String = short.map { "-$it, " }.getOrElse("    ") + "--$long"
+  private names(
+    long: String,
+    short: Option<Char>,
+  ): String = short.map { "-$it, " }.getOrElse("    ") + "--$long"
 }
